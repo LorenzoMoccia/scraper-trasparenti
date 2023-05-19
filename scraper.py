@@ -9,7 +9,8 @@ import time
 # Imposta il logging
 logging.basicConfig(filename='scraper.log', level=logging.INFO, format='%(asctime)s %(message)s')
 
-url = "https://www.comune.roveredoinpiano.pn.it/index.php?id=31944"
+# Richiedi all'utente di inserire l'URL della pagina
+url = input("Inserisci l'URL della pagina: ")
 
 response = requests.get(url)
 
@@ -23,7 +24,13 @@ if not os.path.exists('pdf_files'):
     os.makedirs('pdf_files')
 
 # Estensioni dei documenti consentite
-allowed_extensions = ['.pdf', '.doc', '.docx', '.xlsx', '.ppt', '.pptx']
+allowed_extensions = ['.pdf', '.doc', '.docx', '.xlsx', '.ppt', '.pptx', '.xls', '.p7m',]
+
+# Parola chiave per identificare i documenti simili
+keyword = 'PIAO'
+
+# Dizionario per raggruppare i documenti simili
+document_groups = {}
 
 for div in divs:
     # Controlla se l'ID del div inizia con 'c'
@@ -44,17 +51,34 @@ for div in divs:
         # Estrae tutti i link con estensioni di file consentite
         document_links = [link['href'] for link in links if any(link['href'].lower().endswith(ext) for ext in allowed_extensions)]
 
-    # Se non ci sono documenti, salta alla prossima iterazione
+    # Se non ci sono documenti, cerca in altri div
+    if not document_links:
+        previous_div = div.find_previous_sibling('div')
+        if previous_div:
+            previous_links = previous_div.find_all('a')
+            document_links = [link['href'] for link in previous_links if any(link['href'].lower().endswith(ext) for ext in allowed_extensions)]
+
+    # Se non ci sono ancora documenti, salta alla prossima iterazione
     if not document_links:
         continue
 
     # Sostituisci le barre '/' nel titolo con '_'
     title = title.replace('/', '_')
 
-    # Crea una sottocartella per questa cartella
-    folder_path = os.path.join('pdf_files', title)
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+    # Controlla se il titolo contiene la parola chiave per i documenti simili
+    if keyword in title:
+        # Verifica se esiste già una cartella per il gruppo di documenti simili
+        if keyword in document_groups:
+            folder_path = document_groups[keyword]
+        else:
+            folder_path = os.path.join('pdf_files', keyword)
+            document_groups[keyword] = folder_path
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+    else:
+        folder_path = os.path.join('pdf_files', title)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
 
     # Scarica i documenti
     for doc_link in document_links:
