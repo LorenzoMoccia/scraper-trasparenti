@@ -16,12 +16,16 @@ response = requests.get(url)
 
 soup = BeautifulSoup(response.text, 'html.parser')
 
+# Trova il titolo della pagina
+page_title = soup.title.string.strip()
+
+# Crea la cartella principale con il titolo della pagina
+main_folder = os.path.join('pdf_files', page_title)
+if not os.path.exists(main_folder):
+    os.makedirs(main_folder)
+
 # Trova tutti i div con le classi 'frame-layout-0' e 'frame-layout-3' in tutto il documento
 divs = soup.find_all('div', class_=re.compile(r'frame-layout-[03]'))
-
-# Crea la cartella pdf_files se non esiste
-if not os.path.exists('pdf_files'):
-    os.makedirs('pdf_files')
 
 # Estensioni dei documenti consentite
 allowed_extensions = ['.pdf', '.doc', '.docx', '.xlsx', '.ppt', '.pptx', '.xls', '.p7m',]
@@ -71,12 +75,12 @@ for div in divs:
         if keyword in document_groups:
             folder_path = document_groups[keyword]
         else:
-            folder_path = os.path.join('pdf_files', keyword)
+            folder_path = os.path.join(main_folder, keyword)
             document_groups[keyword] = folder_path
             if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
     else:
-        folder_path = os.path.join('pdf_files', title)
+        folder_path = os.path.join(main_folder, title)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
