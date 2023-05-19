@@ -44,22 +44,22 @@ for div in divs:
         continue
     title = header.text.strip()
 
-    # Trova tutti i link nel div
+    # Trova tutti i link agli allegati nel div corrente
+    attachment_links = []
     links = div.find_all('a')
-    document_links = []  # Inizializza la variabile prima dell'if
     if links is not None:
-        # Estrae tutti i link con estensioni di file consentite
-        document_links = [link['href'] for link in links if any(link['href'].lower().endswith(ext) for ext in allowed_extensions)]
+        attachment_links = [link['href'] for link in links if any(link['href'].lower().endswith(ext) for ext in allowed_extensions)]
 
-    # Se non ci sono documenti, cerca in altri div
-    if not document_links:
-        previous_div = div.find_previous_sibling('div')
-        if previous_div:
-            previous_links = previous_div.find_all('a')
-            document_links = [link['href'] for link in previous_links if any(link['href'].lower().endswith(ext) for ext in allowed_extensions)]
+    # Se non ci sono allegati nel div corrente, cerca gli allegati nel div successivo
+    if not attachment_links:
+        next_div = div.find_next_sibling('div')
+        if next_div is not None:
+            links = next_div.find_all('a')
+            if links is not None:
+                attachment_links = [link['href'] for link in links if any(link['href'].lower().endswith(ext) for ext in allowed_extensions)]
 
-    # Se non ci sono ancora documenti, salta alla prossima iterazione
-    if not document_links:
+    # Se non ci sono allegati, salta alla prossima iterazione
+    if not attachment_links:
         continue
 
     # Sostituisci le barre '/' nel titolo con '_'
@@ -80,21 +80,21 @@ for div in divs:
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-    # Scarica i documenti
-    for doc_link in document_links:
+    # Scarica gli allegati
+    for attachment_link in attachment_links:
         # Crea un URL assoluto se necessario
-        doc_link = urljoin(url, doc_link)
+        attachment_link = urljoin(url, attachment_link)
 
         # Prepara il nome del file
-        filename = doc_link.split('/')[-1]
+        filename = attachment_link.split('/')[-1]
         filepath = os.path.join(folder_path, filename)
 
-        # Stampa l'URL del documento per il debug
-        print(f"Downloading: {doc_link}")
+        # Stampa l'URL dell'allegato per il debug
+        print(f"Downloading attachment: {attachment_link}")
 
         # Scarica il file
         try:
-            response = requests.get(doc_link, allow_redirects=True)
+            response = requests.get(attachment_link, allow_redirects=True)
             if response.status_code == 200:
                 with open(filepath, 'wb') as f:
                     f.write(response.content)
@@ -112,9 +112,9 @@ for div in divs:
 
     print("\n---")
     print(f"Cartella: {title}")
-    print(f"Numero di documenti: {len(document_links)}")
-    print("Documenti scaricati:")
-    for doc_link in document_links:
-        filename = doc_link.split('/')[-1]
+    print(f"Numero di allegati: {len(attachment_links)}")
+    print("Allegati scaricati:")
+    for attachment_link in attachment_links:
+        filename = attachment_link.split('/')[-1]
         print(f" - {filename}")
     print("---\n")
