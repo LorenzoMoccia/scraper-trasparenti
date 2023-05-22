@@ -7,6 +7,8 @@ import re
 import time
 import aiohttp
 import asyncio
+from datetime import datetime
+import random
 
 # Imposta il logging
 logging.basicConfig(filename='scraper.log', level=logging.INFO, format='%(asctime)s %(message)s')
@@ -37,19 +39,31 @@ keyword = 'PIAO'
 # Dizionario per raggruppare i documenti simili
 document_groups = {}
 
+# Rate limiting
+rate_limiting_delay = 2
+
 async def download_file(session, url, filepath):
-    async with session.get(url) as response:
-        if response.status == 200:
-            with open(filepath, 'wb') as f:
-                f.write(await response.read())
-            logging.info(f"Scaricato {filepath}")
-            print(f"Download completo: {filepath}")
-        else:
-            logging.error(f"Errore nel scaricare {filepath}, codice di stato: {response.status}")
-            print(f"Errore nel scaricare: {filepath} (Codice di stato: {response.status})")
+    for _ in range(3):  # 3 attempts
+        try:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    with open(filepath, 'wb') as f:
+                        f.write(await response.read())
+                    logging.info(f"Scaricato {filepath}")
+                    print(f"Download completo: {filepath}")
+                    return
+                else:
+                    logging.error(f"Errore nel scaricare {filepath}, codice di stato: {response.status}")
+                    print(f"Errore nel scaricare: {filepath} (Codice di stato: {response.status})")
+        except Exception as e:
+            logging.error(f"Errore nel scaricare {filepath}, errore: {str(e)}")
+            print(f"Errore nel scaricare: {filepath} ({str(e)})")
+        await asyncio.sleep(rate_limiting_delay)  # delay before retrying
 
 async def main():
-    async with aiohttp.ClientSession() as session:
+    conn = aiohttp.TCPConnector(limit=10)  # limit simultaneous downloads
+    async with aiohttp.ClientSession(connector=conn) as session:
+        tasks = []
         for div in divs:
             div_id = div.get('id', '')
             if not div_id.startswith('c'):
@@ -79,7 +93,6 @@ async def main():
                 folder_path = os.path.join(main_folder, title)
                 os.makedirs(folder_path, exist_ok=True)
 
-            tasks = []
             for attachment_link in attachment_links:
                 attachment_link = urljoin(url, attachment_link)
                 filename = attachment_link.split('/')[-1]
@@ -87,16 +100,7 @@ async def main():
                 print(f"Downloading attachment: {attachment_link}")
                 tasks.append(download_file(session, attachment_link, filepath))
 
-            await asyncio.gather(*tasks)
-
-            print("\n---")
-            print(f"Cartella: {title}")
-            print(f"Numero di allegati: {len(attachment_links)}")
-            print("Allegati scaricati:")
-            for attachment_link in attachment_links:
-                filename = attachment_link.split('/')[-1]
-                print(f" - {filename}")
-            print("---\n")
+        await asyncio.gather(*tasks)
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
